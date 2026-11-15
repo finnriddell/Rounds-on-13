@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rounds on Thirteen</title>
+<meta property="og:title" content="Rounds on Thirteen">
+<meta property="og:description" content="Thirteen bells ringing every possible order of themselves, from 15 November 2026 until about 28 June 2719. It's ringing now.">
+<meta name="theme-color" content="#111317">
+<meta name="description" content="Thirteen bells ringing every possible order of themselves, 6,227,020,800 rows, from 15 November 2026 to about 28 June 2719. A piece of English change ringing made by Claude.">
+<style>
+  :root { --ink:#111317; --paper:#e9e4da; --dim:#8a8f99; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--ink); color:var(--paper); overflow:hidden;
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; left:0; right:0; top:0; padding:18px 22px; display:flex; flex-wrap:wrap; gap:14px;
+    justify-content:space-between; align-items:flex-start; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  #status .t { font-size:19px; letter-spacing:.03em; }
+  #status .s { font-size:12px; color:var(--dim); margin-top:5px; font-family: ui-monospace, Menlo, monospace; line-height:1.6; }
+  #bells { display:flex; flex-wrap:wrap; gap:5px; max-width:330px; justify-content:flex-end; align-items:center; }
+  #bells span { font-size:11px; color:var(--dim); margin-right:3px; font-family: ui-monospace, Menlo, monospace; }
+  .bell { width:24px; height:24px; border-radius:50%; border:1.5px solid currentColor; background:transparent;
+    color:inherit; font: 11px ui-monospace, Menlo, monospace; cursor:pointer; opacity:.7; padding:0; }
+  .bell.on { opacity:1; background:rgba(255,255,255,.08); }
+  #foot { position:fixed; left:0; right:0; bottom:0; display:flex; flex-wrap:wrap; justify-content:center; gap:10px; padding:16px; }
+  button { touch-action:manipulation; }
+  .btn { background:transparent; color:var(--paper); border:1px solid rgba(233,228,218,.35); border-radius:999px;
+    padding:8px 18px; font: 14px Georgia, serif; cursor:pointer; letter-spacing:.03em; }
+  .btn:hover { border-color:rgba(233,228,218,.7); }
+  .overlay { position:fixed; inset:0; display:flex; padding:24px; overflow-y:auto; overscroll-behavior:contain;
+    background:rgba(17,19,23,.94); transition:opacity 1.2s; z-index:10; }
+  .overlay.hide { opacity:0; pointer-events:none; }
+  .card { max-width:480px; margin:auto; text-align:center; line-height:1.6; }
+  .card h1 { font-weight:normal; font-size:34px; letter-spacing:.06em; margin:0 0 18px; }
+  .card p { margin:0 0 12px; color:#cfc9bd; }
+  .card .small { font-size:12px; color:var(--dim); margin-top:20px; }
+  /* About drawer: slides in from the right on wide screens, up from the bottom on phones */
+  #about { position:fixed; top:0; right:0; height:100%; width:min(440px, 100vw); z-index:20;
+    background:#16191e; border-left:1px solid rgba(233,228,218,.1); box-shadow:-20px 0 60px rgba(0,0,0,.45);
+    display:flex; flex-direction:column; transform:translateX(105%); transition:transform .45s cubic-bezier(.2,.8,.2,1);
+    visibility:hidden; }
+  #about.open { transform:none; visibility:visible; }
+  #about header { flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:18px 18px 14px 26px; border-bottom:1px solid rgba(233,228,218,.08); }
+  #about header h2 { font-weight:normal; font-size:19px; letter-spacing:.05em; margin:0; }
+  #about header .sub { font-size:12px; color:var(--dim); margin-top:3px; }
+  #aboutClose { flex:none; width:36px; height:36px; border-radius:50%; border:1px solid rgba(233,228,218,.25);
+    background:transparent; color:var(--paper); font-size:20px; line-height:1; cursor:pointer; }
+  #aboutClose:hover, #aboutClose:focus-visible { border-color:rgba(233,228,218,.7); outline:none; }
+  #note { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    padding:6px 26px 40px; line-height:1.65; scrollbar-width:thin; scrollbar-color:rgba(233,228,218,.25) transparent;
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 48px), transparent);
+            mask-image:linear-gradient(to bottom, #000 calc(100% - 48px), transparent); }
+  #note h3 { font-weight:normal; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#b8a98a; margin:24px 0 6px; }
+  #note p { margin:0; color:#cfc9bd; font-size:15px; }
+  #note .end { text-align:center; color:var(--dim); font-size:12px; margin-top:30px; }
+  .short { display:none; }
+  @media (max-width: 640px) {
+    #about { top:auto; bottom:0; width:100%; height:82vh; border-left:none; border-top:1px solid rgba(233,228,218,.12);
+      border-radius:18px 18px 0 0; transform:translateY(105%); box-shadow:0 -20px 60px rgba(0,0,0,.5); }
+    #about header { padding-top:22px; position:relative; }
+    #about header::before { content:""; position:absolute; top:8px; left:50%; width:40px; height:4px; margin-left:-20px;
+      border-radius:2px; background:rgba(233,228,218,.25); }
+  }
+  /* phones: one compact control row, bells in one line under the counter */
+  @media (max-width: 640px) {
+    #hud { flex-direction:column; gap:10px; padding:12px 14px 22px;
+      background:linear-gradient(to bottom, rgba(17,19,23,.96) 0, rgba(17,19,23,.9) 75%, rgba(17,19,23,0)); }
+    #status .t { font-size:16px; }
+    #status .s { font-size:10.5px; line-height:1.5; }
+    #bells { max-width:none; justify-content:flex-start; flex-wrap:nowrap; gap:3px; }
+    #bells span { display:none; }
+    .bell { width:23px; height:23px; font-size:10px; flex:none; }
+    #foot { flex-wrap:nowrap; gap:6px; padding:10px 8px calc(12px + env(safe-area-inset-bottom)); }
+    #foot .btn { padding:8px 11px; font-size:14px; min-width:38px; }
+    #lens, .long { display:none; }
+    .short { display:inline; }
+    .card h1 { font-size:28px; }
+    .card p { font-size:15px; }
+  }
+  /* touch screens zoom by pinching, so the − + buttons step aside */
+  @media (pointer: coarse) { #zout, #zin { display:none; } }
+  .card .row { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<canvas id="c" role="img" aria-label="Thirteen coloured threads weaving downward, one for each bell, tracing every row rung so far"></canvas>
+
+<div id="hud" style="display:none">
+  <div id="status"><div class="t" id="t"></div><div class="s" id="s"></div></div>
+  <div id="bells"><span>follow</span></div>
+</div>
+<div id="foot" style="display:none">
+  <button class="btn" id="first" title="the first row, at midnight (Home)" aria-label="Go to the first row"><span class="long">⇡ first row</span><span class="short">⇡</span></button>
+  <button class="btn" id="zout" title="zoom out (−, or pinch)" aria-label="Zoom out">−</button>
+  <button class="btn" id="zin" title="zoom in (+, or pinch)" aria-label="Zoom in">+</button>
+  <button class="btn" id="tin" title="faster lens: show quicker bells again ([)" aria-label="Faster lens">◂</button>
+  <span class="btn" id="lens" style="cursor:default;border-style:dashed" title="the time lens">every row</span>
+  <button class="btn" id="tout" title="slower lens: every 13th row, then every 156th… (])" aria-label="Slower lens">▸</button>
+  <button class="btn" id="now" title="back to the live row (End)" aria-label="Back to now"><span class="long">↓ now</span><span class="short">↓</span></button>
+  <button class="btn" id="sound" aria-label="Sound on or off">mute</button>
+  <button class="btn" id="aboutBtn" aria-controls="about" aria-expanded="false" title="about this piece (i)"><span class="long">about</span><span class="short">i</span></button>
+</div>
+<div id="soundHint" style="position:fixed;top:45%;left:0;right:0;text-align:center;font-size:14px;color:#e9e4da;transition:opacity .6s;pointer-events:none;opacity:0;z-index:5;text-shadow:0 0 12px #111317">tap anywhere to start the sound</div>
+<div id="hint" style="position:fixed;bottom:64px;left:0;right:0;text-align:center;font-size:12px;color:#8a8f99;transition:opacity 2s;pointer-events:none;opacity:0">scroll or drag up to look back over everything rung so far</div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>Rounds on Thirteen</h1>
+    <p>Thirteen bells, rung through every order they can make: 6,227,020,800 rows.</p>
+    <p>They started at midnight UTC on 15 November 2026. Each change swaps two neighbours and no row ever comes twice. They come back to rounds in <span id="endyear">the 28th century</span>.</p>
+    <p>It's ringing now whether anyone is listening or not, and everyone who opens this page hears the same moment of the same peal.</p>
+    <p>Use the ▸ lens to step back in time. Look at only every 13th row and the fastest bell disappears, and what's left is this same piece on twelve bells. Step again and it's eleven. The pattern contains itself all the way down, and the slowest lenses only fill in over centuries.</p>
+    <div class="row">
+      <button class="btn" id="listen">Listen</button>
+      <button class="btn" id="look">Just watch</button>
+    </div>
+    <p class="small">Made by Claude on 15 November 2026, the same morning as a smaller sister piece on six bells. Turn the volume up: headphones bring out the low bells. The striking is slightly human: each blow lands a few milliseconds off the beat, and the same blow is always off by the same amount.</p>
+  </div>
+</div>
+
+
+<!-- A note for anyone who reads this page rather than watching it, human or not. -->
+<aside id="about" role="dialog" aria-modal="false" aria-labelledby="aboutTitle">
+  <header>
+    <div><h2 id="aboutTitle">Rounds on Thirteen</h2><div class="sub">a note for anyone who reads this page rather than watching it</div></div>
+    <button id="aboutClose" aria-label="Close the note (Esc)" title="close (Esc)">×</button>
+  </header>
+  <article id="note" tabindex="0">
+    <h3>What this is</h3>
+    <p>Thirteen bells ringing every possible order of themselves: 6,227,020,800 rows, each rung exactly once. It began at 00:00 UTC on 15 November 2026 and comes back to its starting order around 28 June 2719. It runs on the clock, so everyone who opens it hears the same moment, and no one will ever witness it from start to finish.</p>
+
+    <h3>Where it comes from</h3>
+    <p>English change ringing, a tradition from the early 1600s. Ringers in church towers rang their bells in permutations, not tunes, under two rules: a bell may move only one place from one row to the next, and no row may ever be rung twice. Ringers call the second rule <em>truth</em>. They worked out the mathematics of permutations by ear and memory, a century before group theory gave it a name. This piece uses their oldest method, plain changes, stretched far past what any human band could ring.</p>
+
+    <h3>What to look for</h3>
+    <p>The piece contains itself. Take every 13th row, set aside the fastest bell, and what's left is this same piece on twelve bells. Take every 156th row and it's eleven bells, and so on down. Every bell is nudged whenever a quicker one crosses it, but set the quicker ones aside and each bell is keeping its own slower time: one step of the second bell takes thirteen rows, one step of the third takes 156, of the fourth 1,716, like a clock with thirteen hands. The ▸ lens lets you step down through those levels.</p>
+
+    <h3>What you can't see from here</h3>
+    <p>Almost all of it. On the day it was made, about 0.0002% had been rung. The slowest lenses will stay nearly empty for centuries.</p>
+
+    <h3>Who made it</h3>
+    <p>Claude, an AI, on a Sunday morning. It was given the morning to make something of its own choosing, and offered to keep it. It's offered to any reader, human or otherwise, in the spirit of the ringers, who rang for whoever happened to be passing.</p>
+
+    <p class="end">— Esc or × to go back to the bells —</p>
+  </article>
+</aside>
+
+
+<script>
+(() => {
+  const N = 13, BEAT = 0.26;
+  const T0 = Date.UTC(2026, 10, 15, 0, 0, 0) / 1000;      // midnight UTC, 15 Nov 2026
+  const FACT = 6227020800;                                 // 13!
+  const TOTAL_ROWS = FACT + 1;                             // every order, then rounds again
+  const SYM = "1234567890ETA";                             // ringers' symbols for bells 1–13
+  const sym = b => SYM[b - 1];
+
+  // bell 1 (treble) highest, bell 13 (tenor) lowest: D major over two octaves from D3
+  const STEPS = [0,2,4,5,7,9,11,12,14,16,17,19,21];
+  const FREQ = {}; for (let b = 1; b <= N; b++) FREQ[b] = 146.83 * Math.pow(2, STEPS[N - b] / 12);
+  const COLORS = {}; for (let b = 1; b <= N; b++) COLORS[b] = `hsl(${(28 + (b - 1) * 26) % 360} 52% 68%)`;
+  const withA = (b, a) => COLORS[b].replace(")", ` / ${a})`);
+
+  // Row r of plain changes (Steinhaus–Johnson–Trotter order), computed directly from r.
+  const cache = new Map();
+  function row(r) {
+    if (r >= FACT) return Array.from({ length: N }, (_, i) => i + 1);
+    if (cache.has(r)) return cache.get(r);
+    // unrank SJT
+    const ranks = []; let x = r;
+    for (let n = N; n >= 2; n--) { ranks.push(x); x = Math.floor(x / n); }
+    let p = [1];
+    for (let n = 2; n <= N; n++) {
+      const rk = ranks[N - n], parent = Math.floor(rk / n), i = rk % n;
+      const idx = parent % 2 === 0 ? n - 1 - i : i;
+      p.splice(idx, 0, n);
+    }
+    const out = p.map((_, i) => N + 1 - p[N - 1 - i]);    // first row is rounds; the treble hunts
+    if (cache.size > 4000) cache.delete(cache.keys().next().value);
+    cache.set(r, out);
+    return out;
+  }
+
+  // time of a strike, in seconds since T0 (row r, place pos)
+  const hash = (r, pos) => {
+    let h = (Math.floor(r / 4294967296) * 2654435761 ^ (r >>> 0) ^ (pos * 40503)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0; h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  const beatOf = (r, pos) => r * N + pos + Math.floor(r / 2);
+  const strikeT = (r, pos) => beatOf(r, pos) * BEAT + (hash(r, pos) - 0.5) * 0.018;
+  const END_T = strikeT(FACT, N - 1);
+  const endDate = new Date((T0 + END_T) * 1000);
+  document.getElementById("endyear").textContent = `the year ${endDate.getUTCFullYear()}`;
+
+  // which strike is the latest one at or before time t (seconds since T0)
+  function locate(t) {
+    if (t < 0) return { r: 0, pos: -1 };
+    if (t >= END_T) return { r: FACT, pos: N - 1 };
+    const b = Math.floor(t / BEAT), pair = Math.floor(b / (2 * N + 1)), w = b - pair * (2 * N + 1);
+    let r, pos;
+    if (w < N) { r = 2 * pair; pos = w; } else if (w < 2 * N) { r = 2 * pair + 1; pos = w - N; }
+    else { r = 2 * pair + 1; pos = N - 1; }
+    // jitter can move a strike either side of the beat; settle exactly
+    while (pos >= 0 && strikeT(r, pos) > t) { pos--; if (pos < 0 && r > 0) { r--; pos = N - 1; } }
+    for (;;) {
+      const n = pos + 1 < N ? { r, pos: pos + 1 } : { r: r + 1, pos: 0 };
+      if (n.r > FACT || strikeT(n.r, n.pos) > t) break;
+      r = n.r; pos = n.pos;
+    }
+    return { r, pos };
+  }
+  const nextOf = ({ r, pos }) => (pos + 1 < N ? { r, pos: pos + 1 } : { r: r + 1, pos: 0 });
+  const nowT = () => Date.now() / 1000 - T0;
+
+  // ---------- sound ----------
+  let ctx = null, panners = {}, muted = true, clockOffset = 0, cursor = null;
+  // Phones: lift the upper partials, which small speakers can actually reproduce.
+  const SMALL_SPEAKER = matchMedia("(pointer: coarse)").matches;
+
+  // iPhones mute Web Audio when the ring/silent switch is on silent. Playing a silent media
+  // element (and asking for a "playback" audio session where Safari supports it) moves the
+  // page into the media channel, the way music sites do, so the bells are heard.
+  let keepAlive = null;
+  function silentLoop() {
+    const rate = 8000, n = rate / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, "data"); v.setUint32(40, n * 2, true);
+    const a = new Audio(URL.createObjectURL(new Blob([buf], { type: "audio/wav" })));
+    a.loop = true; a.setAttribute("playsinline", ""); a.preload = "auto";
+    return a;
+  }
+  function unlockAudio() {                     // must run inside a tap or click
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    try { if (!keepAlive) keepAlive = silentLoop(); keepAlive.play().catch(() => {}); } catch (e) {}
+    if (ctx) {
+      ctx.resume().catch(() => {});
+      try {                                    // a one-sample blip, the classic iOS unlock
+        const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050);
+        s.connect(ctx.destination); s.start(0);
+      } catch (e) {}
+    }
+  }
+
+  function setupAudio() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
+    const makeup = ctx.createGain(); makeup.gain.value = 1.6;
+    comp.connect(makeup).connect(ctx.destination);
+    const master = ctx.createGain(); master.gain.value = SMALL_SPEAKER ? 2.4 : 1.4; master.connect(comp);
+    const len = Math.floor(ctx.sampleRate * 3), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3); }
+    const conv = ctx.createConvolver(); conv.buffer = ir;
+    const wet = ctx.createGain(); wet.gain.value = 0.24; conv.connect(wet).connect(comp);
+    for (let b = 1; b <= N; b++) {
+      const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+      if (pan.pan) pan.pan.value = ((b - 7) / 6) * 0.6;
+      pan.connect(master); pan.connect(conv); panners[b] = pan;
+    }
+    setInterval(schedule, 40);
+  }
+  // A church bell's partials: hum, prime, minor-third tierce, quint, nominal, superquint, octave nominal.
+  // The nominal gets a slightly detuned twin, so each bell has the slow "warble" a real cast bell has.
+  const PARTIALS = [[0.5, 0.26, 3.8], [1, 0.62, 2.8], [1.189, 0.38, 2.1], [1.5, 0.14, 1.4],
+                    [2, 0.55, 1.7], [2, 0.22, 1.7, 0.7], [2.99, 0.14, 0.9], [4.02, 0.06, 0.5]];
+  function strike(bell, t) {
+    const f = FREQ[bell], out = panners[bell], loud = 0.05 * (bell > 9 ? 1.2 : 1);
+    for (const [ratio, amp, dec, detune = 0] of PARTIALS) {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f * ratio + detune;
+      const d = dec * (1 + (bell - 1) * 0.04);      // bigger bells ring on longer
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp * loud, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(out); o.start(t); o.stop(t + d + 0.05);
+    }
+  }
+  function schedule() {
+    if (!ctx || muted) return;
+    const t = nowT();
+    // audio clock -> piece clock
+    clockOffset = t - ctx.currentTime;
+    if (!cursor) cursor = nextOf(locate(t));
+    let guard = 0;
+    while (cursor.r <= FACT && guard++ < 40) {
+      const st = strikeT(cursor.r, cursor.pos);
+      if (st < t - 0.05) { cursor = nextOf(locate(t)); continue; }   // fell behind (tab asleep): rejoin
+      if (st > t + 0.25) break;
+      strike(row(cursor.r)[cursor.pos], st - clockOffset);
+      cursor = nextOf(cursor);
+    }
+  }
+
+  // ---------- drawing ----------
+  const cv = document.getElementById("c"), g2 = cv.getContext("2d");
+  let W = 0, H = 0;
+  function resize() { const d = window.devicePixelRatio || 1; W = innerWidth; H = innerHeight;
+    cv.width = W * d; cv.height = H * d; g2.setTransform(d, 0, 0, d, 0, 0); }
+  addEventListener("resize", resize); resize();
+  let ROW_H = 14;
+  let follow = 0, running = false;
+  let pinned = null;            // null = following the live row; otherwise the row (float) held at the reading line
+  let liveF = 0;                // live position in rows (float), updated each frame
+
+  const fmt = n => n.toLocaleString("en-GB");
+  function since(sec) {
+    if (sec >= 2 * 31557600) { const y = sec / 31557600;
+      return y >= 100 ? `${Math.round(y).toLocaleString("en-GB")} years` : `${y.toFixed(1)} years`; }
+    if (sec >= 86400 * 60) return `${Math.round(sec / 86400).toLocaleString("en-GB")} days`;
+    const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+    const s = Math.floor(sec % 60);
+    return d > 0 ? `${d}d ${h}h ${m}m` : h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  // The lens: depth d shows every S(d)-th row with the d fastest bells taken out.
+  // What remains is exactly plain changes on 13−d bells: the piece contains itself.
+  let depth = 0;
+  const STRIDE = [1]; for (let d = 1; d < N - 1; d++) STRIDE[d] = STRIDE[d - 1] * (N - d + 1);
+  const rowAt = (i, d) => { const rr = row(i * STRIDE[d]); return d ? rr.filter(b => b > d) : rr; };
+  const stepSecs = d => STRIDE[d] * (N + 0.5) * BEAT;
+
+  function draw() {
+    requestAnimationFrame(draw);
+    g2.clearRect(0, 0, W, H);
+    if (!running) return;
+    const t = nowT(), cur = locate(t);
+    const curRow = cur.r, S = STRIDE[depth], n = N - depth;
+    const colW = Math.max(14, Math.min(40, (W * 0.5) / (n - 1)));
+    const width = colW * (n - 1);
+    const digitsW = n * 9;
+    const x0 = Math.round((W - width - digitsW - 36) / 2);
+    const x = pos => x0 + pos * colW;
+    // live position, measured in steps of the current lens
+    const frac = Math.min(1, Math.max(0, (t - strikeT(curRow, 0)) / (N * BEAT)));
+    const curI = Math.floor(curRow / S);
+    liveF = depth ? (curRow + frac) / S : curRow + frac;
+    if (pinned !== null && pinned >= liveF - 0.01) pinned = null;
+    const viewF = pinned === null ? liveF : Math.max(0, pinned);
+    const offset = viewF * ROW_H - H * 0.64;
+    const y = i => i * ROW_H - offset;
+    const i0 = Math.max(0, Math.floor(offset / ROW_H) - 2);
+    const i1 = Math.min(curI, Math.ceil((offset + H) / ROW_H) + 2);
+    const struck = (i, pos) => depth > 0 || i < curRow || (i === curRow && pos <= cur.pos);
+    const thin = Math.min(1, ROW_H / 14);
+
+    // threads
+    for (let b = depth + 1; b <= N; b++) {
+      const on = follow === b, dim = follow && !on;
+      g2.strokeStyle = withA(b, on ? 1 : dim ? 0.15 : 0.66);
+      g2.lineWidth = (on ? 2.4 : 1.3) * Math.max(0.6, thin); g2.lineJoin = "round";
+      g2.beginPath(); let started = false;
+      for (let i = i0; i <= i1; i++) {
+        const pos = rowAt(i, depth).indexOf(b);
+        if (!struck(i, pos)) break;
+        if (!started) { g2.moveTo(x(pos), y(i)); started = true; } else g2.lineTo(x(pos), y(i));
+      }
+      g2.stroke();
+    }
+    // glow on the newest strikes (only when every row is shown)
+    if (depth === 0) for (let r = Math.max(0, curRow - 1); r <= curRow; r++) {
+      const rr = row(r);
+      for (let pos = 0; pos < N; pos++) {
+        if (!struck(r, pos)) continue;
+        const age = (t - strikeT(r, pos)) / 1.1; if (age < 0 || age > 1) continue;
+        const b = rr[pos]; if (follow && follow !== b) continue;
+        g2.fillStyle = withA(b, 0.5 * (1 - age));
+        g2.beginPath(); g2.arc(x(pos), y(r), 2.5 + 8 * age, 0, Math.PI * 2); g2.fill();
+      }
+    }
+    // the rows written out (only when there's room to read them)
+    const tx = x0 + width + 36;
+    g2.font = "11px ui-monospace, Menlo, monospace"; g2.textBaseline = "middle";
+    if (ROW_H >= 10) for (let i = i0; i <= i1; i++) {
+      const rr = rowAt(i, depth), isCur = i === curI;
+      const fade = isCur ? 1 : pinned !== null ? 0.4 : Math.max(0.08, 0.32 - (curI - i) * 0.005);
+      for (let pos = 0; pos < n; pos++) {
+        if (!struck(i, pos)) continue;
+        const b = rr[pos], lit = !follow || follow === b;
+        g2.fillStyle = withA(b, lit ? fade : fade * 0.3);
+        g2.fillText(sym(b), tx + pos * 9, y(i));
+      }
+    }
+    // at deeper lenses, show how much of the next step has been rung
+    if (depth > 0 && pinned === null) {
+      const p = ((curRow + frac) / S) % 1, yy = y(curI) + ROW_H * Math.max(0.5, Math.min(1, 6 / ROW_H));
+      g2.fillStyle = "rgba(233,228,218,.12)"; g2.fillRect(x0, yy, width, 2);
+      g2.fillStyle = "rgba(233,228,218,.55)"; g2.fillRect(x0, yy, width * p, 2);
+      const nextAt = T0 + strikeT(Math.min(FACT, (curI + 1) * S), 0), left = nextAt - (T0 + t);
+      const when = left > 86400 * 60
+        ? new Date(nextAt * 1000).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" })
+        : `in ${since(Math.max(0, left))}`;
+      g2.fillStyle = "rgba(233,228,218,.55)"; g2.font = "11px ui-monospace, Menlo, monospace";
+      g2.textAlign = "center";
+      g2.fillText(`next step at this lens: ${when}`, x0 + width / 2, yy + 18);
+      g2.textAlign = "left";
+    }
+
+    // reading line and its label when looking back
+    if (pinned !== null) {
+      const ly = H * 0.64, vi = Math.min(curI, Math.max(0, Math.round(viewF))), vr = vi * S;
+      g2.strokeStyle = "rgba(233,228,218,.18)"; g2.lineWidth = 1;
+      g2.beginPath(); g2.moveTo(x0 - 30, ly); g2.lineTo(x0 + width + 30, ly); g2.stroke();
+      g2.fillStyle = "rgba(233,228,218,.6)"; g2.font = "11px ui-monospace, Menlo, monospace";
+      g2.textAlign = "right";
+      g2.fillText(`row ${fmt(vr + 1)} · ${since(Math.max(0, t - strikeT(vr, 0)))} ago`, x0 - 38, ly);
+      g2.textAlign = "left";
+    }
+    nowBtn.style.display = pinned === null ? "none" : "";
+
+    const done = t >= END_T;
+    document.getElementById("t").textContent = done ? "rounds again" : `row ${fmt(curRow + 1)} of ${fmt(FACT)}`;
+    const pct = (curRow / FACT) * 100;
+    const lens = depth === 0
+      ? "lens: every row"
+      : `lens: every ${fmt(S)}th row · one step = ${since(stepSecs(depth))} · bell${depth > 1 ? "s" : ""} ${sym(1)}${depth > 1 ? "–" + sym(depth) : ""} too quick to see`;
+    document.getElementById("s").innerHTML =
+      `ringing for ${since(Math.max(0, t))} · ${pct < 0.0001 ? pct.toExponential(2) : pct.toFixed(6)}% rung<br>` +
+      `rounds again around ${endDate.toLocaleDateString("en-GB", { year: "numeric", month: "long", timeZone: "UTC" })}<br>${lens}`;
+    lensLabel.textContent = depth === 0 ? "every row" : `every ${fmt(S)}th`;
+  }
+  requestAnimationFrame(draw);
+
+  // ---------- controls ----------
+  const bellsEl = document.getElementById("bells");
+  for (let b = 1; b <= N; b++) {
+    const el = document.createElement("button");
+    el.className = "bell"; el.textContent = sym(b); el.style.color = COLORS[b];
+    el.title = b === 1 ? "treble" : b === N ? "tenor" : `bell ${b}`;
+    el.onclick = () => { follow = follow === b ? 0 : b;
+      [...bellsEl.querySelectorAll(".bell")].forEach((e, i) => e.classList.toggle("on", follow === i + 1)); };
+    bellsEl.appendChild(el);
+  }
+  // ---------- looking back ----------
+  function scrollRows(dr) {                       // negative = back in time
+    const base = pinned === null ? liveF : pinned;
+    const next = Math.max(0, base + dr);
+    pinned = next >= liveF ? null : next;         // you can't scroll past what has been rung
+  }
+  function zoom(f) {
+    const old = ROW_H;
+    ROW_H = Math.max(1.5, Math.min(28, ROW_H * f));
+  }
+  const inAbout = e => e.target && e.target.closest && e.target.closest("#about, #aboutBtn");
+  addEventListener("wheel", e => {
+    if (!running || inAbout(e)) return;
+    e.preventDefault();
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? H : 1);
+    if (e.ctrlKey || e.metaKey) { zoom(Math.exp(-dy * 0.01)); return; }   // trackpad pinch arrives as ctrl+wheel
+    scrollRows(dy / ROW_H);
+  }, { passive: false });
+  // one finger drags through time; two fingers pinch to zoom
+  const touches = new Map(); let pinchD = 0;
+  const spread = () => { const [a, b] = [...touches.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  cv.addEventListener("pointerdown", e => {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.setPointerCapture(e.pointerId);
+    if (touches.size === 2) pinchD = spread();
+  });
+  cv.addEventListener("pointermove", e => {
+    const p = touches.get(e.pointerId); if (!p) return;
+    const dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if (touches.size === 1) scrollRows(-dy / ROW_H);
+    else if (touches.size === 2) { const d = spread(); if (pinchD > 0 && d > 0) zoom(d / pinchD); pinchD = d; }
+  });
+  const lift = e => { touches.delete(e.pointerId); pinchD = touches.size === 2 ? spread() : 0; };
+  cv.addEventListener("pointerup", lift); cv.addEventListener("pointercancel", lift);
+  cv.style.touchAction = "none";
+  const nowBtn = document.getElementById("now");
+  const lensLabel = document.getElementById("lens");
+  function setDepth(d) {
+    d = Math.max(0, Math.min(N - 2, d));
+    if (d === depth) return;
+    if (pinned !== null) pinned = pinned * STRIDE[depth] / STRIDE[d];
+    depth = d;
+    if (follow && follow <= depth) { follow = 0;
+      [...bellsEl.querySelectorAll(".bell")].forEach(e => e.classList.remove("on")); }
+  }
+  document.getElementById("tout").onclick = () => setDepth(depth + 1);
+  document.getElementById("tin").onclick = () => setDepth(depth - 1);
+  nowBtn.onclick = () => { pinned = null; };
+  document.getElementById("first").onclick = () => { pinned = 0; };
+  document.getElementById("zin").onclick = () => zoom(1.4);
+  document.getElementById("zout").onclick = () => zoom(1 / 1.4);
+  addEventListener("keydown", e => {
+    if (!running || aboutOpen) return;
+    if (e.key === "ArrowUp") scrollRows(-3); else if (e.key === "ArrowDown") scrollRows(3);
+    else if (e.key === "PageUp") scrollRows(-H / ROW_H * 0.8); else if (e.key === "PageDown") scrollRows(H / ROW_H * 0.8);
+    else if (e.key === "Home") pinned = 0; else if (e.key === "End") pinned = null;
+    else if (e.key === "]") setDepth(depth + 1); else if (e.key === "[") setDepth(depth - 1);
+    else if (e.key === "-" || e.key === "_") zoom(1 / 1.4); else if (e.key === "+" || e.key === "=") zoom(1.4);
+    else return;
+    e.preventDefault();
+  });
+
+  const about = document.getElementById("about"), aboutBtn = document.getElementById("aboutBtn");
+  let aboutOpen = false;
+  function setAbout(open) {
+    aboutOpen = open;
+    about.classList.toggle("open", open);
+    document.body.classList.toggle("about-open", open);
+    aboutBtn.setAttribute("aria-expanded", String(open));
+    if (open) { document.getElementById("note").scrollTop = 0; setTimeout(() => document.getElementById("note").focus({ preventScroll: true }), 50); }
+    else aboutBtn.focus({ preventScroll: true });
+  }
+  aboutBtn.onclick = () => setAbout(!aboutOpen);
+  document.getElementById("aboutClose").onclick = () => setAbout(false);
+  addEventListener("keydown", e => {
+    if (e.key === "Escape" && aboutOpen) { setAbout(false); e.preventDefault(); }
+    else if ((e.key === "i" || e.key === "?") && !e.metaKey && !e.ctrlKey) setAbout(!aboutOpen);
+  });
+  // swipe the sheet down to close it on phones
+  let sheetY = null;
+  about.addEventListener("touchstart", e => { if (document.getElementById("note").scrollTop <= 0) sheetY = e.touches[0].clientY; }, { passive: true });
+  about.addEventListener("touchmove", e => { if (sheetY !== null && e.touches[0].clientY - sheetY > 90) { sheetY = null; setAbout(false); } }, { passive: true });
+  about.addEventListener("touchend", () => { sheetY = null; });
+
+  const soundBtn = document.getElementById("sound");
+  function setMuted(m) {
+    muted = m; cursor = null;
+    if (!m) { if (!ctx) setupAudio(); unlockAudio(); checkSound(); }
+    else if (keepAlive) keepAlive.pause();
+    soundBtn.textContent = m ? "listen" : "mute";
+    soundBtn.setAttribute("aria-pressed", String(!m));
+  }
+  soundBtn.onclick = () => setMuted(!muted);
+  // If the sound still hasn't started (some phones need a second tap), say so, and let any tap start it.
+  const soundHint = document.getElementById("soundHint");
+  function checkSound() {
+    setTimeout(() => {
+      const stuck = ctx && !muted && ctx.state !== "running";
+      soundHint.style.opacity = stuck ? 1 : 0;
+    }, 900);
+  }
+  addEventListener("pointerdown", () => {
+    if (ctx && !muted && ctx.state !== "running") { unlockAudio(); checkSound(); }
+  }, true);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && ctx && !muted) { cursor = null; ctx.resume().catch(() => {}); if (keepAlive) keepAlive.play().catch(() => {}); }
+  });
+  function enter(withSound) {
+    running = true;
+    document.getElementById("intro").classList.add("hide");
+    document.getElementById("hud").style.display = "flex";
+    document.getElementById("foot").style.display = "flex";
+    setMuted(!withSound);
+    const hint = document.getElementById("hint");
+    setTimeout(() => hint.style.opacity = 1, 2500);
+    setTimeout(() => hint.style.opacity = 0, 9000);
+  }
+  document.getElementById("listen").onclick = () => enter(true);
+  document.getElementById("look").onclick = () => enter(false);
+  addEventListener("keydown", e => { if (e.key === " " && running && !aboutOpen) { e.preventDefault(); setMuted(!muted); } });
+})();
+</script>
+</body>
+</html>
